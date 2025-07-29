@@ -15,15 +15,16 @@ from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
-api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+api_key = st.secrets["embedding"]["api_key"]
 
 # embedding = HuggingFaceInferenceAPIEmbeddings(
 #     api_key=api_key,
 #     model_name="sentence-transformers/all-MiniLM-L6-v2"
 # )
-embedding = HuggingFaceEmbeddings(
+embedding = HuggingFaceEmbeddings(api_key=api_key,
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
+
 
 
 llm = HuggingFaceEndpoint(
