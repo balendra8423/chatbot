@@ -2,7 +2,7 @@
                             
 import streamlit as st
 import tempfile
-from dotenv import load_dotenv
+
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain.chains import RetrievalQA
@@ -10,7 +10,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
-load_dotenv()
+
 api_key = st.secrets["HF_API_KEY"]["Embeddings"]
 
 embedding = HuggingFaceEmbeddings(
@@ -93,6 +93,7 @@ if "vectorstore" in st.session_state:
         answer = answer_question(st.session_state["vectorstore"], query)
         st.write("💬 Answer:")
         st.write(answer)
+
 
 
 
