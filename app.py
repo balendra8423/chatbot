@@ -1,66 +1,65 @@
-
-                            
 import streamlit as st
 import tempfile
-from dotenv import load_dotenv
+import os
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain.chains import RetrievalQA
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-from langchain_huggingface import HuggingFaceEmbeddings
-import os
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace, HuggingFaceEmbeddings
 
-api_key = st.secrets["HF_API_KEY"]
+# Set Hugging Face token from Streamlit secrets
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = st.secrets["HF_API_KEY"]
 
+# Embedding model
 embedding = HuggingFaceEmbeddings(
-    api_key=api_key,
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
+# LLM model
 llm = HuggingFaceEndpoint(
     repo_id="meta-llama/Llama-3.1-8B-Instruct",
     task="text-generation"
 )
 model = ChatHuggingFace(llm=llm)
 
+# Function to process input
 def process_input(input_type, input_data):
-    documents = ""
+    documents = []
     if input_type == 'Link':
-        docs = []
         for url in input_data:
             loader = WebBaseLoader(url)
-            docs.extend(loader.load())
-        documents = docs
+            documents.extend(loader.load())
     else:
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{input_type.lower()}") as temp_file:
             temp_file.write(input_data.read())
             temp_path = temp_file.name
         if input_type == 'PDF':
             loader = PyPDFLoader(temp_path)
+            documents = loader.load()
         elif input_type == 'DOCX':
             loader = Docx2txtLoader(temp_path)
+            documents = loader.load()
         elif input_type == 'TXT':
             loader = TextLoader(temp_path, encoding='utf-8')
+            documents = loader.load()
         elif input_type == 'Text':
-            documents = input_data
-        if input_type != 'Text':
-            docs = loader.load()
-            text = "".join(doc.page_content for doc in docs)
-            documents = text
+            documents = [input_data]
+
     splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
-    if input_type == 'Link':
-        texts = splitter.split_documents(documents)
-        texts = [doc.page_content for doc in texts]
+    if input_type == 'Text':
+        texts = splitter.split_text(documents[0])
     else:
-        texts = splitter.split_text(documents)
+        texts = [doc.page_content for doc in splitter.split_documents(documents)]
+
     vector_store = FAISS.from_texts(texts, embedding)
     return vector_store
 
+# Function to answer questions
 def answer_question(vectorstore, query):
     qa = RetrievalQA.from_chain_type(llm=model, retriever=vectorstore.as_retriever())
     return qa.run(query)
 
+# Streamlit UI
 st.title('🧠 Personal Chatbot')
 
 input_type = st.selectbox("Input Type", ['Link', 'PDF', 'Text', 'DOCX', 'TXT'])
@@ -93,7 +92,3 @@ if "vectorstore" in st.session_state:
         answer = answer_question(st.session_state["vectorstore"], query)
         st.write("💬 Answer:")
         st.write(answer)
-
-
-
-
