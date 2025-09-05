@@ -1,31 +1,23 @@
 
                             
 import streamlit as st
-import os
 import tempfile
 from dotenv import load_dotenv
-
-
-from langchain.vectorstores import FAISS
-from langchain.document_loaders import WebBaseLoader, PyPDFLoader, Docx2txtLoader, TextLoader
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain.chains import RetrievalQA
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from langchain.embeddings import HuggingFaceInferenceAPIEmbeddings,HuggingFaceEmbeddings
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_huggingface import HuggingFaceEmbeddings
+import os
 
 load_dotenv()
-api_key = st.secrets["embedding"]["api_key"]
+api_key = os.environ["HF_API_KEY"]
 
-# embedding = HuggingFaceInferenceAPIEmbeddings(
-#     api_key=api_key,
-#     model_name="sentence-transformers/all-MiniLM-L6-v2"
-# )
-embedding = HuggingFaceEmbeddings(api_key=api_key,
+embedding = HuggingFaceEmbeddings(
+    api_key=api_key,
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
-
-
 
 llm = HuggingFaceEndpoint(
     repo_id="meta-llama/Llama-3.1-8B-Instruct",
@@ -33,19 +25,18 @@ llm = HuggingFaceEndpoint(
 )
 model = ChatHuggingFace(llm=llm)
 
-
 def process_input(input_type, input_data):
     documents = ""
-
     if input_type == 'Link':
-        loader = WebBaseLoader(input_data)
-        documents = loader.load()
+        docs = []
+        for url in input_data:
+            loader = WebBaseLoader(url)
+            docs.extend(loader.load())
+        documents = docs
     else:
-        # For file-based inputs
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{input_type.lower()}") as temp_file:
             temp_file.write(input_data.read())
             temp_path = temp_file.name
-
         if input_type == 'PDF':
             loader = PyPDFLoader(temp_path)
         elif input_type == 'DOCX':
@@ -54,29 +45,22 @@ def process_input(input_type, input_data):
             loader = TextLoader(temp_path, encoding='utf-8')
         elif input_type == 'Text':
             documents = input_data
-
         if input_type != 'Text':
             docs = loader.load()
             text = "".join(doc.page_content for doc in docs)
             documents = text
-
     splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
     if input_type == 'Link':
         texts = splitter.split_documents(documents)
         texts = [doc.page_content for doc in texts]
     else:
         texts = splitter.split_text(documents)
-
-    # FAISS index
     vector_store = FAISS.from_texts(texts, embedding)
     return vector_store
-
 
 def answer_question(vectorstore, query):
     qa = RetrievalQA.from_chain_type(llm=model, retriever=vectorstore.as_retriever())
     return qa.run(query)
-
-
 
 st.title('🧠 Personal Chatbot')
 
@@ -110,3 +94,4 @@ if "vectorstore" in st.session_state:
         answer = answer_question(st.session_state["vectorstore"], query)
         st.write("💬 Answer:")
         st.write(answer)
+
