@@ -11,8 +11,7 @@ from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_huggingface import HuggingFaceEmbeddings
 import os
 
-load_dotenv()
-api_key = os.environ["HF_API_KEY"]
+api_key = st.secrets["HF_API_KEY"]
 
 embedding = HuggingFaceEmbeddings(
     api_key=api_key,
@@ -94,4 +93,5 @@ if "vectorstore" in st.session_state:
         answer = answer_question(st.session_state["vectorstore"], query)
         st.write("💬 Answer:")
         st.write(answer)
+
 
